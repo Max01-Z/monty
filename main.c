@@ -1,38 +1,74 @@
 #include "monty.h"
+#include "lists.h"
+
+data_t data = DATA_INIT;
 
 /**
- * main - main function
- * @argc: arguments count
- * @argv: arguments traverse (file path expected)
- * Return: 0 always - success!
+ * monty - helper function for main function
+ * @args: pointer to struct of arguments from main
+ *
+ * Description: opens and reads from the file
+ * containing the opcodes, and calls the function
+ * that will find the corresponding executing function
  */
-
-int main(int argc, char **argv)
+void monty(args_t *args)
 {
-	trave_t *traverse = NULL;
-	size_t n;
-	void (*execute)(stack_t **stack, unsigned int line_number);
+	size_t len = 0;
+	int get = 0;
+	void (*code_func)(stack_t **, unsigned int);
 
-	if (argc != 2)
-		_error(ERROR_USAGE_FILE);
-
-	built_in();
-	traverse->filename = argv[1];
-	traverse->file = fopen(traverse->filename, "r");
-
-	if (traverse->file == NULL)
-		_error(ERROR_OPEN_FILE);
-	while (getline(&traverse->line, &n, traverse->file) > 0)
+	if (args->ac != 2)
 	{
-		traverse->line_num++;
-
-		if (_parse(traverse->line) == EXIT_FAILURE)
-			continue;
-
-		execute = _opcode();
-		execute(&traverse->stack, traverse->line_num);
+		dprintf(STDERR_FILENO, USAGE);
+		exit(EXIT_FAILURE);
 	}
-	free(traverse);
-	_free();
+	data.fptr = fopen(args->av, "r");
+	if (!data.fptr)
+	{
+		dprintf(STDERR_FILENO, FILE_ERROR, args->av);
+		exit(EXIT_FAILURE);
+	}
+	while (1)
+	{
+		args->line_number++;
+		get = getline(&(data.line), &len, data.fptr);
+		if (get < 0)
+			break;
+		data.words = strtow(data.line);
+		if (data.words[0] == NULL || data.words[0][0] == '#')
+		{
+			free_all(0);
+			continue;
+		}
+		code_func = get_func(data.words);
+		if (!code_func)
+		{
+			dprintf(STDERR_FILENO, UNKNOWN, args->line_number, data.words[0]);
+			free_all(1);
+			exit(EXIT_FAILURE);
+		}
+		code_func(&(data.stack), args->line_number);
+		free_all(0);
+	}
+	free_all(1);
+}
+
+/**
+ * main - entry point for monty bytecode interpreter
+ * @argc: number of arguments
+ * @argv: array of arguments
+ *
+ * Return: EXIT_SUCCESS or EXIT_FAILURE
+ */
+int main(int argc, char *argv[])
+{
+	args_t args;
+
+	args.av = argv[1];
+	args.ac = argc;
+	args.line_number = 0;
+
+	monty(&args);
+
 	return (EXIT_SUCCESS);
 }
